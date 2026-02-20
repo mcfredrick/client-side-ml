@@ -1,0 +1,7 @@
+node_modules/
+
+# Large binary files in docs/ (derived from npm packages via build)
+# See README.md for GitHub Pages deployment options
+docs/htdemucs.onnx
+docs/*.wasm
+docs/*.mjs

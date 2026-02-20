@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demucs Stem Separator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    h1 { margin-bottom: 0.5rem; }
+    .info { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    #drop-zone {
+      border: 2px dashed #aaa; border-radius: 8px; padding: 2rem;
+      text-align: center; cursor: pointer; margin-bottom: 1.5rem;
+      transition: border-color 0.2s;
+    }
+    #drop-zone.dragover { border-color: #4a9eff; background: #f0f7ff; }
+    #drop-zone input { display: none; }
+    #status { margin-bottom: 1rem; font-weight: 500; }
+    #progress-bar-container {
+      display: none; background: #eee; border-radius: 4px;
+      height: 24px; margin-bottom: 1.5rem; overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%; background: #4a9eff; border-radius: 4px;
+      transition: width 0.3s; width: 0%;
+    }
+    .stem { margin-bottom: 1rem; }
+    .stem label { display: block; font-weight: 600; margin-bottom: 0.25rem; text-transform: capitalize; }
+    .stem audio { width: 100%; }
+    .stem a { font-size: 0.85rem; margin-left: 0.5rem; }
+    #stems { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Demucs Stem Separator</h1>
+  <p class="info">
+    Client-side audio stem separation using HTDemucs v4 + ONNX Runtime Web.
+    Model (~170 MB) downloads on first use and is cached.
+    Works best in Chrome/Edge with WebGPU.
+  </p>
+
+  <div id="drop-zone">
+    <p>Drop an audio file here, or click to select</p>
+    <p style="font-size:0.8rem;color:#999;margin-top:0.5rem">.wav, .mp3, .ogg, .flac</p>
+    <input type="file" id="file-input" accept="audio/*" />
+  </div>
+
+  <div id="status"></div>
+  <div id="progress-bar-container"><div id="progress-bar"></div></div>
+
+  <div id="stems"></div>
+
+  <!-- Enable SharedArrayBuffer on GitHub Pages (needed for multi-threaded WASM) -->
+  <script src="coi-serviceworker.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

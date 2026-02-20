@@ -1,0 +1,17 @@
+{
+  "name": "client-side-ml",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "npx http-server docs -p 8080 --cors -c-1"
+  },
+  "dependencies": {
+    "demucs": "^1.0.0",
+    "onnxruntime-web": "^1.23.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

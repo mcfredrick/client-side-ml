@@ -11300,7 +11300,7 @@ ${u}`, c = n.createShaderModule({ code: d, label: e.name });
       self.postMessage({ type: "status", text: "Downloading model (~170 MB, cached after first use)..." });
       console.log("[worker] Checking model cache...");
       const cache = await caches.open("demucs-model-v1");
-      const modelUrl = "https://github.com/mcfredrick/client-side-ml/releases/download/v0.1.0/htdemucs.onnx";
+      const modelUrl = "./htdemucs.onnx";
       const MIN_MODEL_SIZE = 100 * 1024 * 1024;
       let response = await cache.match(modelUrl);
       if (response) {

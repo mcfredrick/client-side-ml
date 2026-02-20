@@ -13,8 +13,7 @@ async function getModel() {
     console.log('[worker] Checking model cache...');
 
     const cache = await caches.open('demucs-model-v1');
-    // Fetch from GitHub Releases (GitHub Pages can't serve Git LFS files)
-    const modelUrl = 'https://github.com/mcfredrick/client-side-ml/releases/download/v0.1.0/htdemucs.onnx';
+    const modelUrl = './htdemucs.onnx';
     const MIN_MODEL_SIZE = 100 * 1024 * 1024; // 100 MB — real model is ~166 MB
 
     let response = await cache.match(modelUrl);

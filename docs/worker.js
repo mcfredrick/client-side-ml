@@ -11301,13 +11301,25 @@ ${u}`, c = n.createShaderModule({ code: d, label: e.name });
       console.log("[worker] Checking model cache...");
       const cache = await caches.open("demucs-model-v1");
       const modelUrl = "./htdemucs.onnx";
+      const MIN_MODEL_SIZE = 100 * 1024 * 1024;
       let response = await cache.match(modelUrl);
       if (response) {
-        console.log("[worker] Model found in cache.");
-      } else {
-        console.log("[worker] Model not cached, downloading...");
+        const cachedSize = parseInt(response.headers.get("content-length") || "0", 10);
+        if (cachedSize > MIN_MODEL_SIZE) {
+          console.log(`[worker] Model found in cache (${(cachedSize / 1024 / 1024).toFixed(0)} MB).`);
+        } else {
+          console.log(`[worker] Cached model too small (${cachedSize} bytes), re-downloading...`);
+          await cache.delete(modelUrl);
+          response = null;
+        }
+      }
+      if (!response) {
+        console.log("[worker] Downloading model...");
         const t02 = performance.now();
         response = await fetch(modelUrl);
+        if (!response.ok) {
+          throw new Error(`Model download failed: HTTP ${response.status}`);
+        }
         const elapsed2 = ((performance.now() - t02) / 1e3).toFixed(1);
         console.log(`[worker] Model downloaded in ${elapsed2}s, caching...`);
         await cache.put(modelUrl, response.clone());

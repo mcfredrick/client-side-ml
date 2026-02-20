@@ -19,6 +19,8 @@ npm run build
 
 Open http://localhost:8080 in Chrome or Edge (WebGPU gives best performance; Firefox works via WASM fallback).
 
+`npm install` downloads the `demucs` npm package which includes the 166 MB `htdemucs.onnx` model. `npm run build` copies it (along with ONNX Runtime WASM files) from `node_modules/` into `docs/`. Everything needed to run is in `docs/` after the build.
+
 ## Project Structure
 
 ```
@@ -30,6 +32,7 @@ src/
 
 build.mjs                     # esbuild bundler config
 serve.sh                      # Local dev server script
+.github/workflows/deploy.yml  # GitHub Actions deployment to Pages
 docs/                         # Build output (served as static site)
 ```
 
@@ -72,6 +75,8 @@ docs/                         # Build output (served as static site)
 4. Copies ONNX Runtime WASM files from `node_modules/onnxruntime-web/dist/`
 5. Copies the `htdemucs.onnx` model from `node_modules/demucs/`
 
+**Important**: the worker must be bundled without `format: 'esm'` (use esbuild's default IIFE format). ESM format causes workers to fail in Firefox and other browsers that don't support module workers.
+
 ### Browser Compatibility
 
 | Browser | Backend | Notes |
@@ -83,74 +88,49 @@ docs/                         # Build output (served as static site)
 
 ## Deploying to GitHub Pages
 
-The `docs/` directory is a complete static site. The challenge is the large files:
+### GitHub Actions (recommended)
 
-- `htdemucs.onnx` — 166 MB (ONNX model weights)
-- `ort-wasm-simd-threaded.jsep.wasm` — 24 MB
-- `ort-wasm-simd-threaded.wasm` — 12 MB
+The repo includes `.github/workflows/deploy.yml` which handles deployment automatically on push to `main`. The workflow:
 
-These exceed GitHub's 100 MB file size limit for normal git commits. Three options:
+1. Checks out the repo
+2. Runs `npm ci` (downloads the `demucs` package with the 166 MB model)
+3. Runs `npm run build` (copies model + WASM files to `docs/`)
+4. Deploys `docs/` to GitHub Pages via `actions/deploy-pages`
 
-### Option A: Git LFS (simplest)
+This avoids all the issues with large file hosting — the model comes from npm at build time and is deployed directly to Pages on the same origin.
 
-Track large files with Git Large File Storage:
+**Setup**: In your repo settings, set Pages source to **GitHub Actions** (not "Deploy from a branch").
 
 ```bash
-# Install Git LFS if needed
-brew install git-lfs
-git lfs install
-
-# Track the large files
-git lfs track "docs/htdemucs.onnx"
-git lfs track "docs/*.wasm"
-
-# Remove them from .gitignore (they were excluded by default)
-# Edit .gitignore to remove the docs/htdemucs.onnx and docs/*.wasm lines
-
-# Commit and push
-git add .gitattributes docs/
-git commit -m "Add build output with LFS for large files"
-git push
+# Or via CLI:
+gh api repos/OWNER/REPO/pages -X PUT --input - <<< '{"build_type":"workflow"}'
 ```
 
-Then in your repo settings, configure GitHub Pages to serve from the `docs/` folder on your branch.
+### Approaches that don't work
 
-**Note:** GitHub LFS has a free tier of 1 GB storage and 1 GB/month bandwidth. Each page visitor downloads the model once (then it's cached in the browser), so bandwidth depends on unique visitors.
+These were attempted and have fundamental issues:
 
-### Option B: Host Models on HuggingFace (best for bandwidth)
-
-Upload the model to a HuggingFace repository and fetch it at runtime:
-
-1. Create a HuggingFace repo and upload `htdemucs.onnx`
-2. Update the model URL in `src/worker.js`:
-
-```js
-// Change this:
-const modelUrl = './htdemucs.onnx';
-
-// To this:
-const modelUrl = 'https://huggingface.co/YOUR_USER/YOUR_REPO/resolve/main/htdemucs.onnx';
-```
-
-3. Rebuild with `npm run build`
-4. The WASM files (24 MB + 12 MB) are under GitHub's limit and can be committed normally
-5. Remove `docs/*.wasm` from `.gitignore`, commit, and push
-
-### Option C: CDN (jsDelivr)
-
-The model is included in the `demucs` npm package, so jsDelivr can serve it:
-
-```js
-const modelUrl = 'https://cdn.jsdelivr.net/npm/demucs@1.0.0/htdemucs.onnx';
-```
-
-This relies on jsDelivr's availability and may be slower for the initial download.
+- **Git LFS + deploy from branch**: GitHub Pages serves the LFS pointer file (134 bytes) instead of the actual model. Pages does not resolve LFS pointers.
+- **GitHub Releases + cross-origin fetch**: The `coi-serviceworker` enforces `Cross-Origin-Embedder-Policy: require-corp` (needed for SharedArrayBuffer/multi-threaded WASM). This blocks cross-origin fetches to `github.com` release assets since they don't include `Cross-Origin-Resource-Policy: cross-origin` headers.
+- **jsDelivr CDN**: Has a 50 MB file size limit for npm packages — the 166 MB model exceeds it. Would also be blocked by COEP.
 
 ### Cross-Origin Isolation
 
-GitHub Pages doesn't support custom HTTP headers. The `coi-serviceworker.min.js` script handles this by intercepting requests via a Service Worker to add the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers needed for `SharedArrayBuffer` (used by multi-threaded WASM). This is already included in the build — no extra configuration needed.
+GitHub Pages doesn't support custom HTTP headers. The `coi-serviceworker.min.js` script handles this by intercepting requests via a Service Worker to add the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers needed for `SharedArrayBuffer` (used by multi-threaded WASM).
 
 On first visit, the service worker registers and reloads the page once. Subsequent visits load normally.
+
+**Troubleshooting**: If you see stale behavior after redeploying (model downloads as 0 bytes, network errors), the service worker or Cache API may be serving old responses. Fix by:
+
+1. DevTools → Storage → Service Workers → **Unregister** all workers for the site
+2. DevTools → Storage → Cache Storage → **Delete** all caches (`demucs-model-v1`, etc.)
+3. Close the tab and reopen
+
+Or open a private/incognito window for a clean test. The worker code includes a size check that auto-discards cached model responses under 100 MB (e.g., from a previous 404), but stale service workers can still cause issues.
+
+### AudioContext Autoplay Policy
+
+Browsers block `AudioContext` creation before user interaction. The `AudioContext` must be created inside a user-triggered event handler (file selection, button click), not at page load. If created at load time, `decodeAudioData` will silently hang.
 
 ## Adding a Custom Classification Model
 
